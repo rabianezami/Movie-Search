@@ -1,35 +1,102 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+import { useEffect, useState } from 'react'
+import './App.css'
+import { Film } from "lucide-react";
+import SearchBar from './Components/SearchBar'
+import MovieList from './Components/MovieList'
+
+const API_KEY = import.meta.env.VITE_OMDB_API_KEY
+
+export default function App() {
+  const [searchTerm, setSearchTerm] = useState("horror")
+  const [movies, setMovies] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const trimmed = searchTerm.trim()
+
+  useEffect(() => {
+    if (!trimmed) {
+      setMovies([])
+      setError("")
+      setLoading(false)
+      return
+    }
+
+    if (!API_KEY) {
+      setMovies([])
+      setLoading(false)
+      setError("Missing OMDb API key.")
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function fetchMovies() {
+      try {
+        setLoading(true)
+        setError("")
+
+        const res = await fetch(
+          `https://www.omdbapi.com/?apikey=${API_KEY}&s=${encodeURIComponent(trimmed)}`,
+          { signal: controller.signal }
+        )
+        const data = await res.json()
+
+        if (data.Response === "False") {
+          setMovies([]);
+          setError(data.Error || "No results.")
+          return;
+        }
+
+        setMovies(data.Search || [])
+      } catch (err) {
+        if (err?.name !== "AbortError") setError("Failed to fetch movies");
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMovies()
+    return () => controller.abort()
+  }, [trimmed])
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="py-4 py-sm-5">
+      <div className="container">
+
+        <div className="glass rounded-4 p-3 p-sm-4 mb-4">
+          <div className="d-flex align-items-center gap-3 mb-3">
+            <div className="brand-badge glass text-light">
+              <Film size={22} />
+            </div>
+            <div>
+              <h1 className="h3 mb-0 text-light">Movie Search</h1>
+              <div className="muted small">OMDb search with Bootstrap UI</div>
+            </div>
+          </div>
+
+          <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+        </div>
+
+
+        {error ? (
+          <div className="alert alert-danger glass border-0" role="alert">
+            <strong>Oops:</strong> {error}
+          </div>
+        ) : null}
+
+        {!error && !loading && trimmed && movies.length === 0 ? (
+          <div className="glass rounded-4 p-4 mb-3">
+            <div className="h5 mb-1">No results</div>
+            <div className="muted">
+              Try searching something else (e.g., Inception, Dune, Spider-Man).
+            </div>
+          </div>
+        ) : null}
+
+        <MovieList movies={movies} loading={loading} />
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    </div>
   )
 }
-
-export default App
